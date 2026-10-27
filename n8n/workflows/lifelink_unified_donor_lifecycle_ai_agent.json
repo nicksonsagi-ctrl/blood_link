@@ -1,0 +1,214 @@
+{
+  "name": "LifeLink Unified AI Agent – Donor Request, Nearby Hospitals & Acceptance Lifecycle",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lifelink-unified-ai-agent",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-master-webhook",
+      "name": "LifeLink Master Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [160, 320],
+      "webhookId": "lifelink-unified-ai-agent"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $headers['x-lifelink-secret'] || $json.headers?.['x-lifelink-secret'] }}",
+              "value2": "={{ $env.N8N_WEBHOOK_SECRET || 'lifelink-secret-key-jaffna' }}"
+            }
+          ]
+        }
+      },
+      "id": "node-verify-secret",
+      "name": "Verify Security Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [380, 320]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{ $json.body?.eventType || $json.eventType }}",
+                    "value2": "DONOR_CONTACT_REQUEST"
+                  }
+                ]
+              },
+              "outputKey": "donor_contact_request"
+            },
+            {
+              "conditions": {
+                "string": [
+                  {
+                    "value1": "={{ $json.body?.eventType || $json.eventType }}",
+                    "value2": "DONOR_RESPONSE"
+                  }
+                ]
+              },
+              "outputKey": "donor_response"
+            }
+          ]
+        },
+        "fallbackOutput": 2
+      },
+      "id": "node-event-router",
+      "name": "Route LifeLink Event (Switch)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [600, 320]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Patient Inquiry from Requester: {{ $json.body?.payload?.requester?.fullName || $json.body?.recipientName }}\nPhone: {{ $json.body?.payload?.requester?.phone || 'Confidential' }}\nBlood Group: {{ $json.body?.payload?.donor?.bloodGroup || 'Compatible' }}\nDonor Name: {{ $json.body?.payload?.donor?.fullName || $json.body?.recipientName }}\nDonor District: {{ $json.body?.payload?.donor?.district || 'Jaffna' }}\nRequester Message: {{ $json.body?.payload?.message || 'Emergency blood required' }}\nNearby Hospitals Available: {{ JSON.stringify($json.body?.payload?.nearbyHospitals || []) }}",
+        "options": {
+          "systemMessage": "You are the LifeLink Sri Lanka Intelligent Blood Donation AI Agent. An urgent patient or family member has contacted a voluntary blood donor. Your job is to format a respectful, urgent, bilingual (Tamil & English) notification. Emphasize voluntary heroism, provide the verified nearby hospital blood banks where donation can safely take place, and include emergency contact instructions."
+        }
+      },
+      "id": "node-ai-donor-request-triage",
+      "name": "Gemini AI: Triage Request & Nearby Hospitals",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [880, 160]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.EMAIL_FROM || 'no-reply@lifelink.lk' }}",
+        "toEmail": "={{ $json.body?.recipientEmail || $json.recipientEmail }}",
+        "subject": "={{ $json.body?.subject || '🩸 Urgent Blood Donation Request from ' + ($json.body?.payload?.requester?.fullName || 'Requester') + ' – LifeLink Sri Lanka' }}",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n<meta charset='utf-8'>\n<style>\n  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f6f7f9; margin: 0; padding: 20px; }\n  .card { max-width: 620px; margin: auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }\n  .header { background: linear-gradient(135deg, #DC0A20, #9B0014); color: white; padding: 28px 24px; text-align: center; }\n  .badge { display: inline-block; background: rgba(255,255,255,0.2); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }\n  .content { padding: 24px; color: #1f2937; line-height: 1.6; }\n  .quote { background: #fff5f5; border-left: 4px solid #DC0A20; padding: 14px 18px; margin: 16px 0; border-radius: 0 8px 8px 0; color: #991b1b; font-style: italic; }\n  .hosp-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin-top: 16px; }\n  .hosp-item { padding: 10px 0; border-bottom: 1px dashed #e5e7eb; }\n  .hosp-item:last-child { border-bottom: none; }\n  .btn { display: inline-block; background: #DC0A20; color: white !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; margin-top: 18px; }\n  .footer { background: #f9fafb; padding: 16px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; }\n</style>\n</head>\n<body>\n<div class='card'>\n  <div class='header'>\n    <div class='badge'>LifeLink 24/7 AI Blood Dispatch</div>\n    <h1 style='margin:0; font-size:22px; font-weight:800;'>Urgent Blood Donation Request</h1>\n    <p style='margin:6px 0 0 0; font-size:13px; opacity:0.9;'>இரத்த தானக் கோரிக்கை அறிவித்தல்</p>\n  </div>\n  <div class='content'>\n    <p>Dear <strong>{{ $json.body?.recipientName || 'Voluntary Donor' }}</strong>,</p>\n    <p>A patient or caregiver has sent you a direct blood donation request through the <strong>LifeLink Sri Lanka</strong> network.</p>\n    \n    <div style='background:#f3f4f6; padding:14px; border-radius:8px; margin:14px 0;'>\n      <strong>Requester / Patient:</strong> {{ $json.body?.payload?.requester?.fullName || 'Emergency Requester' }}<br>\n      <strong>Blood Group Needed:</strong> <span style='color:#DC0A20; font-weight:bold;'>{{ $json.body?.payload?.donor?.bloodGroup || 'Matches your profile' }}</span><br>\n      <strong>Location:</strong> {{ $json.body?.payload?.donor?.city || 'Jaffna' }}, {{ $json.body?.payload?.donor?.district || 'Northern Province' }}\n    </div>\n\n    <div class='quote'>\n      <strong>Message from Requester:</strong><br>\n      \"{{ $json.body?.payload?.message || 'Emergency blood required for patient. Please help if you are available.' }}\"\n    </div>\n\n    <div class='hosp-box'>\n      <h3 style='margin:0 0 10px 0; font-size:14px; color:#111827; display:flex; align-items:center;'>\n        🏥 Nearby Certified Hospitals & Blood Banks (அருகிலுள்ள இரத்த வங்கிகள்):\n      </h3>\n      <div style='font-size:12px; color:#4b5563;'>\n        {{#each $json.body?.payload?.nearbyHospitals}}\n        <div class='hosp-item'>\n          <strong>{{this.name}}</strong> ({{this.type}})<br>\n          📞 Phone: <a href='tel:{{this.phone}}' style='color:#DC0A20;'>{{this.phone}}</a> &bull; \n          <a href='{{this.googleMapsUrl}}' target='_blank' style='color:#2563eb;'>📍 View Google Maps</a>\n        </div>\n        {{/each}}\n      </div>\n    </div>\n\n    <p style='margin-top:20px; font-size:13px;'>If you are available to donate, please log in to your LifeLink Donor Portal to <strong>Accept</strong> or <strong>Decline</strong> this request. Once accepted, your contact details will be securely shared with the requester to coordinate transfusion.</p>\n\n    <div style='text-align:center;'>\n      <a href='{{ $env.APP_URL || \"https://lifelink.lk\" }}/donor/dashboard' class='btn'>Open Donor Portal & Respond</a>\n    </div>\n  </div>\n  <div class='footer'>\n    National Blood Transfusion Service (NBTS) Hotline: <strong>1923</strong> &bull; Suwa Seriya Ambulance: <strong>1990</strong><br>\n    LifeLink Sri Lanka – Autonomous Smart Blood Logistics\n  </div>\n</div>\n</body>\n</html>"
+      },
+      "id": "node-email-donor",
+      "name": "Send Email to Donor (With Nearby Hospitals)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1120, 160]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body?.payload?.status || $json.payload?.status }}",
+              "value2": "ACCEPTED"
+            }
+          ]
+        }
+      },
+      "id": "node-check-status-accepted",
+      "name": "Is Response ACCEPTED?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [880, 420]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.EMAIL_FROM || 'no-reply@lifelink.lk' }}",
+        "toEmail": "={{ $json.body?.recipientEmail || $json.recipientEmail }}",
+        "subject": "={{ $json.body?.subject || '🎉 Great News! Donor ' + ($json.body?.payload?.donor?.fullName || 'A Donor') + ' ACCEPTED Your Blood Donation Request! – LifeLink' }}",
+        "html": "=<!DOCTYPE html>\n<html>\n<head>\n<meta charset='utf-8'>\n<style>\n  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f6f7f9; margin: 0; padding: 20px; }\n  .card { max-width: 620px; margin: auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }\n  .header { background: linear-gradient(135deg, #059669, #047857); color: white; padding: 28px 24px; text-align: center; }\n  .badge { display: inline-block; background: rgba(255,255,255,0.25); padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }\n  .content { padding: 24px; color: #1f2937; line-height: 1.6; }\n  .donor-box { background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 18px; margin: 16px 0; }\n  .phone-highlight { display: inline-block; font-size: 18px; font-weight: bold; color: #047857; margin-top: 6px; }\n  .hosp-box { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 14px; margin-top: 16px; }\n  .hosp-item { padding: 10px 0; border-bottom: 1px dashed #e5e7eb; font-size: 12px; }\n  .hosp-item:last-child { border-bottom: none; }\n  .btn { display: inline-block; background: #059669; color: white !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; margin-top: 18px; }\n  .footer { background: #f9fafb; padding: 16px; text-align: center; font-size: 12px; color: #6b7280; border-top: 1px solid #e5e7eb; }\n</style>\n</head>\n<body>\n<div class='card'>\n  <div class='header'>\n    <div class='badge'>Request Accepted &bull; கோரிக்கை ஏற்கப்பட்டது</div>\n    <h1 style='margin:0; font-size:22px; font-weight:800;'>Your Blood Request Was ACCEPTED!</h1>\n    <p style='margin:6px 0 0 0; font-size:13px; opacity:0.95;'>கொடையாளர் உங்கள் கோரிக்கையை ஏற்றுக்கொண்டார்</p>\n  </div>\n  <div class='content'>\n    <p>Dear <strong>{{ $json.body?.recipientName || 'Requester' }}</strong>,</p>\n    <p>We are delighted to inform you that voluntary donor <strong>{{ $json.body?.payload?.donor?.fullName || 'A generous donor' }}</strong> has accepted your blood donation inquiry!</p>\n    \n    <div class='donor-box'>\n      <span style='font-size:11px; text-transform:uppercase; font-weight:bold; color:#065f46;'>Donor Verified Contact Information:</span><br>\n      <strong>Donor Name:</strong> {{ $json.body?.payload?.donor?.fullName }}<br>\n      <strong>Blood Group:</strong> <span style='color:#DC0A20; font-weight:bold;'>{{ $json.body?.payload?.donor?.bloodGroup || 'Compatible' }}</span><br>\n      <strong>Location:</strong> {{ $json.body?.payload?.donor?.city || 'Jaffna' }}, {{ $json.body?.payload?.donor?.district || 'Northern Province' }}<br>\n      <strong>Contact Phone:</strong> <br>\n      <a href='tel:{{ $json.body?.payload?.donor?.phone }}' class='phone-highlight'>📞 {{ $json.body?.payload?.donor?.phone || '+94 77 123 4567' }}</a>\n      {{#if $json.body?.payload?.donor?.email}}\n      <br><span style='font-size:12px; color:#4b5563;'>Email: {{ $json.body?.payload?.donor?.email }}</span>\n      {{/if}}\n      {{#if $json.body?.payload?.responseNote}}\n      <p style='margin:10px 0 0 0; font-size:12px; color:#065f46;'><strong>Donor Note:</strong> \"{{ $json.body?.payload?.responseNote }}\"</p>\n      {{/if}}\n    </div>\n\n    <div class='hosp-box'>\n      <h3 style='margin:0 0 10px 0; font-size:14px; color:#111827;'>\n        🏥 Recommended Hospital Blood Banks for Donation:\n      </h3>\n      <div>\n        {{#each $json.body?.payload?.nearbyHospitals}}\n        <div class='hosp-item'>\n          <strong>{{this.name}}</strong> ({{this.type}})<br>\n          📞 Hotline: <a href='tel:{{this.phone}}' style='color:#059669;'>{{this.phone}}</a> &bull; \n          <a href='{{this.googleMapsUrl}}' target='_blank' style='color:#2563eb;'>📍 Directions Map</a>\n        </div>\n        {{/each}}\n      </div>\n    </div>\n\n    <div style='background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:14px; margin-top:16px; font-size:12px; color:#92400e;'>\n      <strong>Important Next Steps (அடுத்த முக்கிய படிகள்):</strong>\n      <ul style='margin:6px 0 0 0; padding-left:18px;'>\n        <li>Call the donor immediately at the number above to confirm their available time.</li>\n        <li>Inform the hospital blood bank doctor in advance about the incoming voluntary donor.</li>\n        <li>Remind the donor to stay hydrated, rest well, and bring their National Identity Card (NIC).</li>\n      </ul>\n    </div>\n\n    <div style='text-align:center;'>\n      <a href='{{ $env.APP_URL || \"https://lifelink.lk\" }}/requester/dashboard' class='btn'>View in Requester Dashboard</a>\n    </div>\n  </div>\n  <div class='footer'>\n    LifeLink Sri Lanka – Saving Lives Island-wide &bull; Emergency Hotline 1923\n  </div>\n</div>\n</body>\n</html>"
+      },
+      "id": "node-email-requester-accepted",
+      "name": "Send Acceptance Email to Requester",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1120, 360]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.EMAIL_FROM || 'no-reply@lifelink.lk' }}",
+        "toEmail": "={{ $json.body?.recipientEmail || $json.recipientEmail }}",
+        "subject": "={{ $json.body?.subject || 'LifeLink: Update on Your Blood Donation Request' }}",
+        "html": "=<!DOCTYPE html>\n<html>\n<body style='font-family:sans-serif; background:#f9fafb; padding:20px;'>\n  <div style='max-width:580px; margin:auto; background:#fff; border-radius:8px; padding:24px; border:1px solid #e5e7eb;'>\n    <h2 style='color:#4b5563;'>Donor Status Update</h2>\n    <p>Dear {{ $json.body?.recipientName }},</p>\n    <p>The voluntary donor was unable to accept your request at this time.</p>\n    {{#if $json.body?.payload?.responseNote}}\n    <p><strong>Note:</strong> \"{{ $json.body?.payload?.responseNote }}\"</p>\n    {{/if}}\n    <p>Don't worry! You can easily find other active donors in your district or contact the National Blood Transfusion Service hotlines.</p>\n    <div style='margin-top:16px;'>\n      <a href='{{ $env.APP_URL || \"https://lifelink.lk\" }}/find-donors' style='display:inline-block; background:#DC0A20; color:#fff; padding:10px 20px; border-radius:6px; text-decoration:none;'>Find Other Available Donors</a>\n    </div>\n  </div>\n</body>\n</html>"
+      },
+      "id": "node-email-requester-declined",
+      "name": "Send Polite Alternative Email to Requester",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1120, 520]
+    }
+  ],
+  "connections": {
+    "LifeLink Master Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify Security Secret",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Security Secret": {
+      "main": [
+        [
+          {
+            "node": "Route LifeLink Event (Switch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route LifeLink Event (Switch)": {
+      "main": [
+        [
+          {
+            "node": "Gemini AI: Triage Request & Nearby Hospitals",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Response ACCEPTED?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini AI: Triage Request & Nearby Hospitals": {
+      "main": [
+        [
+          {
+            "node": "Send Email to Donor (With Nearby Hospitals)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Response ACCEPTED?": {
+      "main": [
+        [
+          {
+            "node": "Send Acceptance Email to Requester",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Polite Alternative Email to Requester",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

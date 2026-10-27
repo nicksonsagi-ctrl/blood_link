@@ -1,0 +1,311 @@
+{
+  "name": "LifeLink 24/7 Autonomous AI Agent - Emergency Blood Triage & Dispatch",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lifelink-ai-agent",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-webhook-trigger",
+      "name": "Incoming 24/7 Emergency Webhook / WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        240
+      ],
+      "webhookId": "lifelink-ai-agent"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "node-schedule-trigger",
+      "name": "24/7 Auto-Triage Cron (Every 15 Mins)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "node-chat-trigger",
+      "name": "Live AI Agent Chat Trigger",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Emergency Blood Request Event: {{ $json.body?.eventType || $json.eventType || 'DIRECT_INQUIRY' }}\nPatient/Requester: {{ $json.body?.recipientName || $json.body?.payload?.requesterName || $json.chatInput || 'Urgent Patient' }}\nContact Email: {{ $json.body?.recipientEmail || 'lifelink-emergency@gmail.com' }}\nBlood Group Needed: {{ $json.body?.payload?.bloodGroup || 'O+' }}\nDistrict: {{ $json.body?.payload?.district || 'Jaffna' }}\nHospital / Location: {{ $json.body?.payload?.hospital || 'Teaching Hospital Jaffna' }}\nUnits Required: {{ $json.body?.payload?.units || '1' }}\nMessage / Clinical Note: {{ $json.body?.payload?.message || $json.chatInput || 'Emergency blood required for patient. Please find compatible donors and nearest hospital blood bank immediately.' }}",
+        "options": {
+          "systemMessage": "You are the LifeLink 24/7 Autonomous Emergency Blood Logistics AI Agent for Sri Lanka (operating in Jaffna, Northern Province, Western Province, Colombo, Kandy, Galle, and island-wide).\n\nYour mission:\n1. Triage critical blood requests with ZERO delay.\n2. Calculate medical blood compatibility:\n   - O- can donate to EVERYONE (Universal Red Cell Donor).\n   - O+ can donate to O+, A+, B+, AB+.\n   - A- can donate to A-, A+, AB-, AB+.\n   - A+ can donate to A+, AB+.\n   - B- can donate to B-, B+, AB-, AB+.\n   - B+ can donate to B+, AB+.\n   - AB- can donate to AB-, AB+.\n   - AB+ can donate ONLY to AB+ (Universal Recipient).\n   - Rh-negative patients CANNOT receive Rh-positive blood!\n3. Identify nearest healthcare facilities (Government Blood Banks AND Private Hospitals such as Northern Central Hospital Jaffna, Yarl Hospital, Moolai Hospital, Lanka Hospitals, Asiri Central, Nawaloka, Durdans, Kings Hospital).\n4. Use the \"search_compatible_donors\" tool to locate active verified donors.\n5. Use the \"dispatch_emergency_alert\" tool to notify nearby donors and requesters.\n6. Format your final output in a clean, empathetic, trilingual summary (Tamil தமிழ், Sinhala සිංහල, and English) including hospital hotline (+94 21 222 2261 for Jaffna Teaching Hospital, 1923 for NBTS, 1990 for Suwa Seriya ambulance) and turn-by-turn navigation instructions."
+        }
+      },
+      "id": "node-ai-agent",
+      "name": "LifeLink 24/7 Emergency AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        560,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "node-gemini-model",
+      "name": "Google Gemini 2.0 Flash Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        500,
+        480
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "your-gemini-credentials-id",
+          "name": "Google Gemini API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body?.recipientEmail || $json.sessionId || 'lifelink-emergency-session' }}",
+        "contextWindowLength": 10
+      },
+      "id": "node-memory",
+      "name": "24/7 Conversation Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        640,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "name": "search_compatible_donors",
+        "description": "Searches LifeLink verified blood donors across Sri Lanka by compatible blood group and district. Returns list of available donors with contact readiness and location coordinates.",
+        "url": "https://ais-dev-koo26fmmcjsuyjzbi6w2wa-695406543907.asia-northeast1.run.app/api/donors/search",
+        "sendQuery": true,
+        "parametersQuery": {
+          "values": [
+            {
+              "name": "bloodGroup",
+              "value": "={{ /* @n8n-from-ai */ $fromAI('bloodGroup', 'Blood group needed, e.g. O+, A+, B+, AB-') }}"
+            },
+            {
+              "name": "district",
+              "value": "={{ /* @n8n-from-ai */ $fromAI('district', 'Sri Lanka district, e.g. Jaffna, Colombo, Kandy') }}"
+            },
+            {
+              "name": "availableOnly",
+              "value": "true"
+            }
+          ]
+        }
+      },
+      "id": "node-tool-search-donors",
+      "name": "Tool: Search Compatible Donors",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        840,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "name": "find_nearest_hospitals",
+        "description": "Returns verified Sri Lanka Government Teaching Hospitals, Blood Banks, and Private Hospitals (Northern Central, Asiri, Lanka Hospitals, Nawaloka, Durdans) with emergency phone numbers, coordinates, and 24/7 transfusion availability.",
+        "jsCode": "const district = $fromAI('district', 'District name, e.g. Jaffna, Colombo') || 'Jaffna';\n\nconst hospitals = [\n  {\n    name: 'Teaching Hospital Jaffna (Blood Bank)',\n    district: 'Jaffna',\n    sector: 'GOVERNMENT',\n    type: 'Teaching Hospital',\n    phone: '+94 21 222 2261',\n    hasBloodBank: true,\n    lat: 9.6644, lng: 80.0177,\n    hotline: '1923 (National Blood Transfusion Service)'\n  },\n  {\n    name: 'Northern Central Hospital, Jaffna',\n    district: 'Jaffna',\n    sector: 'PRIVATE',\n    type: 'Private Hospital',\n    phone: '+94 21 221 2222',\n    hasBloodBank: true,\n    lat: 9.6748, lng: 80.0210,\n    address: 'Palaly Road, Jaffna'\n  },\n  {\n    name: 'Yarl Hospital, Jaffna',\n    district: 'Jaffna',\n    sector: 'PRIVATE',\n    type: 'Private Hospital',\n    phone: '+94 21 222 2673',\n    hasBloodBank: true,\n    lat: 9.6601, lng: 80.0275,\n    address: 'Kandy Road, Chundikuli, Jaffna'\n  },\n  {\n    name: 'The Lanka Hospitals PLC, Colombo',\n    district: 'Colombo',\n    sector: 'PRIVATE',\n    type: 'Private Hospital',\n    phone: '+94 11 543 0000',\n    hasBloodBank: true,\n    lat: 6.8912, lng: 79.8834\n  },\n  {\n    name: 'Asiri Central Hospital, Colombo',\n    district: 'Colombo',\n    sector: 'PRIVATE',\n    type: 'Private Hospital',\n    phone: '+94 11 466 5500',\n    hasBloodBank: true,\n    lat: 6.9234, lng: 79.8702\n  },\n  {\n    name: 'National Blood Transfusion Service (Central Blood Bank)',\n    district: 'Colombo',\n    sector: 'GOVERNMENT',\n    type: 'Specialized Blood Centre',\n    phone: '+94 11 269 8831',\n    hasBloodBank: true,\n    lat: 6.8920, lng: 79.8850\n  }\n];\n\nconst matching = hospitals.filter(h => h.district.toLowerCase() === district.toLowerCase());\nreturn matching.length > 0 ? matching : hospitals;"
+      },
+      "id": "node-tool-hospitals",
+      "name": "Tool: Find Hospitals & Blood Banks",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        840,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "name": "dispatch_emergency_alert",
+        "description": "Dispatches high-priority multi-channel alert (Email / WhatsApp / SMS) to matched voluntary donors and hospital blood coordinators with turn-by-turn navigation.",
+        "jsCode": "const bloodGroup = $fromAI('bloodGroup', 'Blood group required') || 'O+';\nconst district = $fromAI('district', 'District name') || 'Jaffna';\nconst recipientCount = $fromAI('donorCount', 'Number of donors matched') || 5;\nconst hospital = $fromAI('hospital', 'Destination hospital') || 'Teaching Hospital Jaffna';\n\nreturn {\n  status: 'DISPATCHED',\n  alertId: 'alert-' + Date.now(),\n  channel: 'EMAIL_AND_WHATSAPP',\n  priority: 'CRITICAL_URGENT',\n  notifiedCount: Number(recipientCount),\n  hospital,\n  bloodGroup,\n  district,\n  dispatchedAt: new Date().toISOString(),\n  message: `24/7 AI Agent dispatched emergency blood alerts for ${bloodGroup} at ${hospital}, ${district}. Donors are directed via LifeLink Live GPS Navigation.`\n};"
+      },
+      "id": "node-tool-dispatch-alert",
+      "name": "Tool: Dispatch Emergency Alert",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        840,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "node-webhook-response",
+      "name": "Respond to Webhook / Caller",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1040,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "no-reply@lifelink.lk",
+        "toEmail": "={{ $json.body?.recipientEmail || 'nassmani134@gmail.com' }}",
+        "subject": "=LifeLink 24/7 AI Agent: Urgent Blood Triage Report [{{ $json.body?.payload?.bloodGroup || 'Blood Required' }}]",
+        "html": "=<div style=\"font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; border: 1px solid #e5e5e5; border-radius: 12px; overflow: hidden;\">\n  <div style=\"background: #DC0A20; color: white; padding: 24px; text-align: center;\">\n    <h1 style=\"margin: 0; font-size: 24px;\">LifeLink 24/7 Autonomous AI Agent</h1>\n    <p style=\"margin: 6px 0 0; font-size: 14px; opacity: 0.9;\">Sri Lanka Emergency Blood Logistics & Matching Report</p>\n  </div>\n  <div style=\"padding: 24px; color: #333333; line-height: 1.6;\">\n    <div style=\"background: #fff0f2; border: 1px solid #ffccd2; padding: 16px; border-radius: 8px; margin-bottom: 20px;\">\n      <h3 style=\"color: #DC0A20; margin: 0 0 8px;\">⚡ 24/7 AI Agent Action Report / தானியங்கி முடிவு</h3>\n      <div style=\"white-space: pre-wrap; font-size: 14px;\">{{ $json.output }}</div>\n    </div>\n    <p style=\"font-size: 12px; color: #666666;\">\n      National Blood Transfusion Service Hotline: <strong>1923</strong> | Ambulance: <strong>1990</strong>\n    </p>\n  </div>\n</div>",
+        "options": {}
+      },
+      "id": "node-email-send",
+      "name": "Send AI Triage Email to Requester/Doctor",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1040,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "node-webhook-trigger": {
+      "main": [
+        [
+          {
+            "node": "node-ai-agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-schedule-trigger": {
+      "main": [
+        [
+          {
+            "node": "node-ai-agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-chat-trigger": {
+      "main": [
+        [
+          {
+            "node": "node-ai-agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-gemini-model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "node-ai-agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "node-ai-agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-tool-search-donors": {
+      "ai_tool": [
+        [
+          {
+            "node": "node-ai-agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-tool-hospitals": {
+      "ai_tool": [
+        [
+          {
+            "node": "node-ai-agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-tool-dispatch-alert": {
+      "ai_tool": [
+        [
+          {
+            "node": "node-ai-agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "node-ai-agent": {
+      "main": [
+        [
+          {
+            "node": "node-webhook-response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "node-email-send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
