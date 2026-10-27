@@ -379,7 +379,7 @@ export const InteractiveMapNav: React.FC<InteractiveMapNavProps> = ({
             📍 ${donor.address || `${donor.city}, ${donor.district}`}
           </p>
           <div class="mt-2 text-[10px] ${isAlreadyDonated ? 'text-indigo-800' : donor.isAvailable ? 'text-emerald-700' : 'text-neutral-500'} font-medium flex items-center gap-1">
-            <span>${isAlreadyDonated ? '✅ Already Donated Blood &middot; ஏற்கனவே வழங்கியுள்ளார்' : donor.isAvailable ? '🛡️ Verified Lifesaver &middot; Ready to Donate' : 'Unavailable'}</span>
+            <span>${isAlreadyDonated ? '✅ Already Donated Blood' : donor.isAvailable ? '🛡️ Verified Lifesaver &middot; Ready to Donate' : 'Unavailable'}</span>
           </div>
           ${donor.lastDonationDate ? `
             <div class="mt-1 text-[10px] text-neutral-600 flex items-center justify-between">
@@ -390,7 +390,7 @@ export const InteractiveMapNav: React.FC<InteractiveMapNavProps> = ({
           <div class="mt-3 pt-2 border-t border-neutral-100 flex flex-col gap-1.5">
             ${isAlreadyDonated ? `
               <button disabled class="w-full py-1.5 px-2 bg-indigo-100 text-indigo-900 border border-indigo-200 rounded-lg text-xs font-semibold text-center cursor-not-allowed opacity-90">
-                Already Donated (வழங்கியுள்ளார்)
+                Already Donated
               </button>
             ` : `
               <button id="btn-contact-${donor.id}" class="w-full py-1.5 px-2 bg-[#DC0A20] hover:bg-[#B80020] text-white rounded-lg text-xs font-semibold text-center transition-colors">
@@ -1052,7 +1052,7 @@ export const InteractiveMapNav: React.FC<InteractiveMapNavProps> = ({
                         <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-[11px]">
                           {donor.hasActiveCommitment || donor.isRecentlyDonated || donor.commitmentStatus === 'ALREADY_DONATED' || donor.commitmentStatus === 'COMMITTED_TO_PATIENT' ? (
                             <span className="text-indigo-900 bg-indigo-100 border border-indigo-200 px-1.5 py-0.2 rounded font-semibold text-[9.5px]">
-                              ✅ Already Donated (ரத்தம் வழங்கியுள்ளார்)
+                              ✅ Already Donated
                             </span>
                           ) : (
                             <span className="text-emerald-700 font-medium flex items-center gap-1 text-[10px]">

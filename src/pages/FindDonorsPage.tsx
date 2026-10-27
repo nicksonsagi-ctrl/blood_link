@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, MapPin, Shield, Heart, Filter, UserCheck, Navigation } from 'lucide-react';
+import { Search, MapPin, Shield, Heart, Filter, UserCheck, Navigation, Bot, Sparkles } from 'lucide-react';
 import { BLOOD_GROUPS, SRI_LANKA_PROVINCES, SRI_LANKA_DISTRICTS } from '../data/sriLankaData.js';
 import { DonorSearchResult } from '../types/index.js';
 import { ContactDonorModal } from '../components/ContactDonorModal.js';
 import { InteractiveMapNav } from '../components/InteractiveMapNav.js';
+import { AiAssistantChat } from '../components/AiAssistantChat.js';
 import { useAuth } from '../context/AuthContext.js';
 
 interface FindDonorsPageProps {
@@ -18,6 +19,8 @@ export const FindDonorsPage: React.FC<FindDonorsPageProps> = ({ onOpenAuth }) =>
   const [district, setDistrict] = useState<string>('Jaffna');
   const [city, setCity] = useState<string>('');
   const [availableOnly, setAvailableOnly] = useState<boolean>(false);
+  const [aiChatOpen, setAiChatOpen] = useState<boolean>(false);
+  const [showEmbeddedAi, setShowEmbeddedAi] = useState<boolean>(false);
 
   const [donors, setDonors] = useState<DonorSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -64,27 +67,46 @@ export const FindDonorsPage: React.FC<FindDonorsPageProps> = ({ onOpenAuth }) =>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-1">
             <h1 className="text-3xl font-extrabold text-neutral-900">Find Voluntary Blood Donors</h1>
             
-            {/* View Mode Switcher */}
-            <div className="flex items-center bg-white p-1 rounded-xl border border-neutral-300 shadow-2xs self-start sm:self-auto text-xs font-semibold">
+            {/* View Mode & AI Assistant Switcher */}
+            <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+              <div className="flex items-center bg-white p-1 rounded-xl border border-neutral-300 shadow-2xs text-xs font-semibold">
+                <button
+                  onClick={() => setPageMode('list')}
+                  className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                    pageMode === 'list'
+                      ? 'bg-[#DC0A20] text-white shadow-xs'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  <span>📋 List View</span>
+                </button>
+                <button
+                  onClick={() => setPageMode('map')}
+                  className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                    pageMode === 'map'
+                      ? 'bg-[#DC0A20] text-white shadow-xs'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  <span>🗺️ Live Map Navigation</span>
+                </button>
+              </div>
+
               <button
-                onClick={() => setPageMode('list')}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
-                  pageMode === 'list'
-                    ? 'bg-[#DC0A20] text-white shadow-xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                onClick={() => {
+                  setShowEmbeddedAi(prev => !prev);
+                  setAiChatOpen(true);
+                }}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-xs cursor-pointer border ${
+                  showEmbeddedAi
+                    ? 'bg-neutral-900 text-white border-neutral-800'
+                    : 'bg-white text-neutral-850 border-neutral-300 hover:border-[#DC0A20] hover:text-[#DC0A20]'
                 }`}
+                title="Toggle LifeLink 24/7 AI Assistant Companion"
               >
-                <span>📋 List View</span>
-              </button>
-              <button
-                onClick={() => setPageMode('map')}
-                className={`px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 ${
-                  pageMode === 'map'
-                    ? 'bg-[#DC0A20] text-white shadow-xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
-                }`}
-              >
-                <span>🗺️ Live Map Navigation</span>
+                <Bot className="w-4 h-4 text-[#DC0A20]" />
+                <span>{showEmbeddedAi ? 'Hide AI Companion' : '🤖 AI Assistant Chat'}</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               </button>
             </div>
           </div>
@@ -92,6 +114,40 @@ export const FindDonorsPage: React.FC<FindDonorsPageProps> = ({ onOpenAuth }) =>
             Search verified donors across Jaffna and island-wide districts. In compliance with privacy standards, only consenting donors appear with masked identity until you send a verified request.
           </p>
         </div>
+
+        {/* Embedded AI Assistant Panel */}
+        {showEmbeddedAi && (
+          <div className="mb-8 grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
+            <div className="lg:col-span-2">
+              <AiAssistantChat embedded={true} />
+            </div>
+            <div className="bg-gradient-to-br from-neutral-900 via-neutral-850 to-neutral-900 text-white p-6 rounded-2xl border border-neutral-800 flex flex-col justify-between shadow-xs">
+              <div>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#DC0A20]/20 text-[#DC0A20] text-[11px] font-semibold rounded-lg mb-3 border border-[#DC0A20]/30">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>24/7 Sri Lanka Blood Companion</span>
+                </div>
+                <h3 className="text-base font-bold text-white mb-2">LifeLink AI Assistant</h3>
+                <p className="text-xs text-neutral-300 leading-relaxed mb-4">
+                  Ask questions about blood group compatibility, mandatory 90-day donation interval recovery, Jaffna Teaching Hospital emergency hotlines, or donor eligibility criteria in English, தமிழ் (Tamil), or Tanglish.
+                </p>
+                <div className="space-y-2.5 text-xs text-neutral-300">
+                  <div className="p-2.5 bg-neutral-800/80 rounded-xl border border-neutral-700/60">
+                    <span className="font-semibold text-rose-400 block mb-0.5">📞 Emergency Blood Bank Hotline:</span>
+                    <span>NBTS: <strong>1923</strong> &middot; Teaching Hospital Jaffna: <strong>021-222-2261</strong></span>
+                  </div>
+                  <div className="p-2.5 bg-neutral-800/80 rounded-xl border border-neutral-700/60">
+                    <span className="font-semibold text-emerald-400 block mb-0.5">⏱️ 90-Day Recovery Rule:</span>
+                    <span>Donors who recently donated are marked <strong>Already Donated</strong> to honor safe recovery intervals.</span>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 pt-4 border-t border-neutral-800 text-[11px] text-neutral-400">
+                LifeLink AI assists voluntary donation coordination island-wide.
+              </div>
+            </div>
+          </div>
+        )}
 
         {pageMode === 'map' ? (
           <div className="mb-12">
@@ -226,7 +282,7 @@ export const FindDonorsPage: React.FC<FindDonorsPageProps> = ({ onOpenAuth }) =>
                       <span className="text-neutral-600">Status:</span>
                       {donor.hasActiveCommitment || donor.isRecentlyDonated || donor.commitmentStatus === 'ALREADY_DONATED' || donor.commitmentStatus === 'COMMITTED_TO_PATIENT' ? (
                         <span className="text-indigo-900 bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md font-semibold text-[11px] flex items-center gap-1">
-                          <span>✅ Already Donated Blood (ஏற்கனவே வழங்கியுள்ளார்)</span>
+                          <span>✅ Already Donated Blood</span>
                         </span>
                       ) : donor.isAvailable ? (
                         <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded font-medium">
@@ -238,7 +294,7 @@ export const FindDonorsPage: React.FC<FindDonorsPageProps> = ({ onOpenAuth }) =>
                     </div>
                     {(donor.lastDonationDate || donor.hasActiveCommitment || donor.isRecentlyDonated) && (
                       <div className="flex justify-between items-center text-neutral-600">
-                        <span>Donation Date (வழங்கிய திகதி):</span>
+                        <span>Donation Date:</span>
                         <span className="font-mono font-semibold text-indigo-950 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
                           {donor.lastDonationDate || new Date().toISOString().split('T')[0]}
                         </span>
@@ -254,7 +310,7 @@ export const FindDonorsPage: React.FC<FindDonorsPageProps> = ({ onOpenAuth }) =>
                       className="w-full py-2 bg-indigo-100 text-indigo-900 border border-indigo-300 rounded-lg text-xs font-semibold cursor-not-allowed opacity-90 shadow-2xs"
                       title="This donor has already accepted a request and donated blood for a patient."
                     >
-                      Already Donated (ரத்தம் வழங்கியுள்ளார்)
+                      Already Donated
                     </button>
                   ) : (
                     <button
@@ -282,6 +338,28 @@ export const FindDonorsPage: React.FC<FindDonorsPageProps> = ({ onOpenAuth }) =>
         onClose={() => setSelectedDonor(null)}
         onPromptAuth={() => onOpenAuth('login')}
       />
+
+      {/* Floating AI Assistant Chat Dialog */}
+      <AiAssistantChat
+        isOpen={aiChatOpen && !showEmbeddedAi}
+        onClose={() => setAiChatOpen(false)}
+      />
+
+      {/* Floating Trigger Button for AI Assistant */}
+      {!showEmbeddedAi && !aiChatOpen && (
+        <button
+          onClick={() => setAiChatOpen(true)}
+          className="fixed bottom-6 right-6 z-40 bg-gradient-to-r from-[#DC0A20] via-rose-600 to-[#DC0A20] hover:from-[#B80020] hover:to-rose-700 text-white px-4 py-3 rounded-full shadow-xl hover:shadow-2xl transition-all flex items-center gap-2.5 text-xs font-bold cursor-pointer group hover:scale-105"
+          title="Open LifeLink 24/7 AI Medical & Donor Assistant"
+        >
+          <Bot className="w-5 h-5 transition-transform group-hover:rotate-12" />
+          <span>Ask AI Assistant</span>
+          <span className="flex h-2 w-2 relative">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+          </span>
+        </button>
+      )}
     </div>
   );
 };

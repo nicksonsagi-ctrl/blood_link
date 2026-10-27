@@ -135,7 +135,7 @@ export const ContactDonorModal: React.FC<ContactDonorModalProps> = ({
                 <div className="p-3.5 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-950 space-y-1">
                   <div className="flex items-center gap-1.5 font-bold text-indigo-900">
                     <CheckCircle className="w-4 h-4 text-indigo-600 shrink-0" />
-                    <span>Donor Has Already Donated (ஏற்கனவே வழங்கியுள்ளார்)</span>
+                    <span>Donor Has Already Donated</span>
                   </div>
                   <p className="text-[11px] text-indigo-800 leading-relaxed">
                     Donation Date: <strong>{donor.lastDonationDate || 'Recently'}</strong>. This donor has already committed / donated blood for a patient. You cannot send new requests to this donor.

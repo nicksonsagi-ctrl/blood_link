@@ -45,6 +45,7 @@ import {
 } from '../src/db/cloudSqlStore.ts';
 import { triggerN8nWebhook } from './automation.ts';
 import { SRI_LANKA_HOSPITALS } from '../src/data/sriLankaData.ts';
+import { askGeminiAssistant } from './gemini.ts';
 
 export const router = express.Router();
 
@@ -155,6 +156,24 @@ const loginSchema = z.object({
   password: z.string().min(1, 'Password is required')
 });
 
+// AI Assistant Chat endpoint powered by Gemini 3.8 Flash
+router.post('/ai/chat', async (req: Request, res: Response) => {
+  try {
+    const { message, history } = req.body;
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    const reply = await askGeminiAssistant(message.trim(), history || []);
+    return res.json({ success: true, reply });
+  } catch (err: any) {
+    console.error('[AI Chat] Route error:', err);
+    return res.status(500).json({
+      error: 'Failed to process AI chat request',
+      reply: 'An error occurred while connecting to the assistant. For urgent blood emergencies, please dial 1923 (NBTS Sri Lanka) or Teaching Hospital Jaffna at +94 21 222 2261.'
+    });
+  }
+});
 
 // Database status inspection endpoint
 router.get('/database/status', (req: Request, res: Response) => {

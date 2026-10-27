@@ -452,7 +452,7 @@ export const RequesterDashboard: React.FC = () => {
                             </span>
                             {d.hasActiveCommitment || d.isRecentlyDonated || d.commitmentStatus === 'ALREADY_DONATED' || d.commitmentStatus === 'COMMITTED_TO_PATIENT' ? (
                               <span className="block mt-1 text-[10px] text-indigo-900 bg-indigo-100 border border-indigo-200 px-1.5 py-0.5 rounded font-semibold">
-                                ✅ Already Donated (ரத்தம் வழங்கியுள்ளார்)
+                                ✅ Already Donated
                               </span>
                             ) : null}
                           </div>
@@ -476,7 +476,7 @@ export const RequesterDashboard: React.FC = () => {
                           disabled
                           className="mt-4 w-full py-2 bg-indigo-100 text-indigo-900 border border-indigo-300 text-xs font-semibold rounded-lg cursor-not-allowed opacity-90 shadow-2xs"
                         >
-                          Already Donated (ஏற்கனவே ரத்தம் வழங்கியுள்ளார்)
+                          Already Donated
                         </button>
                       ) : (
                         <button
