@@ -21,9 +21,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const { login, register } = useAuth();
   const navigate = useNavigate();
 
-  // Login state
-  const [loginEmail, setLoginEmail] = useState('');
+  // Login state with remembered credentials support
+  const [loginEmail, setLoginEmail] = useState(() => {
+    return localStorage.getItem('lifelink_remembered_email') || '';
+  });
   const [loginPassword, setLoginPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem('lifelink_remember_me') !== 'false';
+  });
 
   // Register state
   const [fullName, setFullName] = useState('');
@@ -64,6 +69,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (!result.success) {
       setError(result.error || 'Login failed. Please verify your credentials.');
     } else {
+      // Auto-save remembered email in localStorage
+      if (rememberMe) {
+        localStorage.setItem('lifelink_remembered_email', loginEmail);
+        localStorage.setItem('lifelink_remember_me', 'true');
+      } else {
+        localStorage.removeItem('lifelink_remembered_email');
+        localStorage.setItem('lifelink_remember_me', 'false');
+      }
+
+      // Explicitly trigger browser Credential Manager to prompt "Save password?"
+      if (typeof window !== 'undefined' && 'PasswordCredential' in window && navigator.credentials) {
+        try {
+          const cred = new (window as any).PasswordCredential({
+            id: loginEmail,
+            password: loginPassword,
+            name: loginEmail
+          });
+          await navigator.credentials.store(cred);
+        } catch {
+          // Continue if browser blocks in sandboxed environments
+        }
+      }
+
       onClose();
       if (result.role === 'ADMIN') navigate('/admin/dashboard');
       else if (result.role === 'DONOR') navigate('/donor/dashboard');
@@ -111,16 +139,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     };
 
     const result = await register(payload);
-    setIsSubmitting(false);
 
     if (!result.success) {
+      setIsSubmitting(false);
       setError(result.error || 'Registration failed.');
-    } else {
-      setSuccess('Account registered successfully! Please log in with your credentials.');
-      setTab('login');
-      setLoginEmail(registerEmail);
-      setLoginPassword(password);
+      return;
     }
+
+    // Auto-login newly registered user immediately so they land directly in their dashboard
+    // and the browser prompts to save their credentials!
+    const loginResult = await login(registerEmail, password);
+    setIsSubmitting(false);
+
+    if (rememberMe) {
+      localStorage.setItem('lifelink_remembered_email', registerEmail);
+      localStorage.setItem('lifelink_remember_me', 'true');
+    }
+
+    // Trigger browser native password saving dialog
+    if (typeof window !== 'undefined' && 'PasswordCredential' in window && navigator.credentials) {
+      try {
+        const cred = new (window as any).PasswordCredential({
+          id: registerEmail,
+          password: password,
+          name: fullName || registerEmail
+        });
+        await navigator.credentials.store(cred);
+      } catch {
+        // Continue safely
+      }
+    }
+
+    onClose();
+    if (role === 'DONOR') navigate('/donor/dashboard');
+    else navigate('/requester/dashboard');
   };
 
   const currentDistrictCities = SRI_LANKA_DISTRICTS[district]?.cities || ['Town'];
@@ -191,16 +243,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {tab === 'login' ? (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
+            <form id="login-form" method="POST" onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                <label htmlFor="login-username" className="block text-xs font-semibold text-neutral-700 mb-1">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
                   <input
+                    id="login-username"
+                    name="username"
                     type="email"
                     required
+                    autoComplete="username"
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
                     placeholder="e.g. donor@lifelink.lk"
@@ -210,20 +265,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                <label htmlFor="login-password" className="block text-xs font-semibold text-neutral-700 mb-1">
                   Password
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
                   <input
+                    id="login-password"
+                    name="password"
                     type="password"
                     required
+                    autoComplete="current-password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="Enter account password"
                     className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-2 focus:ring-[#DC0A20]/20 focus:border-[#DC0A20]"
                   />
                 </div>
+              </div>
+
+              {/* Auto-Save & Remember Credentials Checkbox */}
+              <div className="flex items-center justify-between text-xs pt-0.5">
+                <label className="flex items-center gap-2 text-neutral-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 text-red-600 rounded border-neutral-300 focus:ring-red-500 cursor-pointer"
+                  />
+                  <span className="font-semibold text-neutral-800">
+                    Auto-Save & Remember on this device (தானியங்கி சேமிப்பு)
+                  </span>
+                </label>
               </div>
 
               <button
@@ -235,7 +308,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </button>
             </form>
           ) : (
-            <form onSubmit={handleRegisterSubmit} className="space-y-4">
+            <form id="register-form" method="POST" onSubmit={handleRegisterSubmit} className="space-y-4">
               {/* Role selection: Donor or Requester */}
               <div>
                 <label className="block text-xs font-semibold text-neutral-700 mb-1.5">
@@ -269,14 +342,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               {/* Full Name */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                <label htmlFor="reg-fullname" className="block text-xs font-semibold text-neutral-700 mb-1">
                   Full Name
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
                   <input
+                    id="reg-fullname"
+                    name="name"
                     type="text"
                     required
+                    autoComplete="name"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="e.g. Sivanathan Arun"
@@ -287,14 +363,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               {/* Email */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                <label htmlFor="reg-email" className="block text-xs font-semibold text-neutral-700 mb-1">
                   Email Address (Unique)
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
                   <input
+                    id="reg-email"
+                    name="username"
                     type="email"
                     required
+                    autoComplete="username"
                     value={registerEmail}
                     onChange={(e) => setRegisterEmail(e.target.value)}
                     placeholder="e.g. arun.s@example.lk"
@@ -305,14 +384,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               {/* Phone */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                <label htmlFor="reg-phone" className="block text-xs font-semibold text-neutral-700 mb-1">
                   Sri Lankan Contact Phone
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-neutral-400 absolute left-3 top-3" />
                   <input
-                    type="text"
+                    id="reg-phone"
+                    name="tel"
+                    type="tel"
                     required
+                    autoComplete="tel"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="+94 77 123 4567"
@@ -324,12 +406,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               {/* Passwords */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  <label htmlFor="reg-password" className="block text-xs font-semibold text-neutral-700 mb-1">
                     Password
                   </label>
                   <input
+                    id="reg-password"
+                    name="password"
                     type="password"
                     required
+                    autoComplete="new-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Min 8 characters"
@@ -337,12 +422,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  <label htmlFor="reg-confirm-password" className="block text-xs font-semibold text-neutral-700 mb-1">
                     Confirm Password
                   </label>
                   <input
+                    id="reg-confirm-password"
+                    name="confirm-password"
                     type="password"
                     required
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Repeat password"
@@ -484,12 +572,32 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </label>
               </div>
 
+              {/* Auto-Save & Remember Credentials on Registration */}
+              <div className="flex items-center justify-between text-xs pt-1 p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
+                <label className="flex items-center gap-2 text-neutral-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 text-red-600 rounded border-neutral-300 focus:ring-red-500 cursor-pointer"
+                  />
+                  <div>
+                    <span className="font-semibold text-neutral-800 block">
+                      Auto-Save & Remember Credentials (தானியங்கி சேமிப்பு)
+                    </span>
+                    <span className="text-[10px] text-neutral-500 block">
+                      Browser will prompt to save your login password for easy 1-click access.
+                    </span>
+                  </div>
+                </label>
+              </div>
+
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 px-4 bg-[#DC0A20] hover:bg-[#B80020] text-white rounded-lg font-semibold text-sm transition-colors shadow-xs disabled:opacity-50"
+                className="w-full py-2.5 px-4 bg-[#DC0A20] hover:bg-[#B80020] text-white rounded-lg font-semibold text-sm transition-colors shadow-xs disabled:opacity-50 cursor-pointer"
               >
-                {isSubmitting ? 'Creating Secure Account...' : 'Complete Registration'}
+                {isSubmitting ? 'Creating Account & Signing In...' : 'Complete Registration & Sign In'}
               </button>
             </form>
           )}

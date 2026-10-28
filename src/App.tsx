@@ -16,6 +16,9 @@ import { DonorDashboard } from './pages/DonorDashboard.js';
 import { RequesterDashboard } from './pages/RequesterDashboard.js';
 import { AdminDashboard } from './pages/AdminDashboard.js';
 import { MapNavigationPage } from './pages/MapNavigationPage.js';
+import { HospitalBloodStockPage } from './pages/HospitalBloodStockPage.tsx';
+import { VerifyDonorPage } from './pages/VerifyDonorPage.tsx';
+import { OfflineIndicator } from './components/OfflineIndicator.tsx';
 
 // Route Guard for Protected Roles
 const ProtectedRoute: React.FC<{
@@ -75,6 +78,9 @@ const MainLayout: React.FC = () => {
           <Route path="/map" element={<MapNavigationPage onOpenAuth={handleOpenAuth} />} />
           <Route path="/map-navigation" element={<MapNavigationPage onOpenAuth={handleOpenAuth} />} />
           <Route path="/request-blood" element={<RequestBloodPage onOpenAuth={handleOpenAuth} />} />
+          <Route path="/blood-stock" element={<HospitalBloodStockPage onOpenAuth={handleOpenAuth} />} />
+          <Route path="/verify-donor" element={<VerifyDonorPage />} />
+          <Route path="/verify-donor/:donorId" element={<VerifyDonorPage />} />
           <Route path="/campaigns" element={<CampaignsPage />} />
           <Route path="/donation-guide" element={<DonationGuidePage />} />
           <Route path="/about-us" element={<AboutUsPage />} />
@@ -112,6 +118,8 @@ const MainLayout: React.FC = () => {
       </div>
 
       {!isDashboardRoute && <Footer />}
+
+      <OfflineIndicator />
 
       <AuthModal
         isOpen={authModalOpen}

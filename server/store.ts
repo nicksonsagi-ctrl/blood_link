@@ -197,6 +197,18 @@ export interface AuditLog {
   createdAt: string;
 }
 
+export interface HospitalStockItem {
+  hospitalId: string;
+  hospitalName: string;
+  district: string;
+  province: string;
+  type: string;
+  phone: string;
+  address?: string;
+  lastUpdated: string;
+  inventory: Record<string, { units: number; status: 'CRITICAL' | 'LOW' | 'ADEQUATE' }>;
+}
+
 export interface Session {
   token: string;
   userId: string;
@@ -221,6 +233,7 @@ class DatabaseStore {
   deliveryLogs: AutomationDeliveryLog[] = [];
   auditLogs: AuditLog[] = [];
   sessions: Map<string, Session> = new Map();
+  hospitalStocks: Map<string, HospitalStockItem> = new Map();
   private settingsFilePath = path.resolve(process.cwd(), '.lifelink_settings.json');
   settings: Record<string, string> = {
     N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL || '',
@@ -611,6 +624,160 @@ class DatabaseStore {
 
     this.campaigns.set(c1.id, c1);
     this.campaigns.set(c2.id, c2);
+
+    // Seed Sri Lanka Hospital Blood Bank Live Stock Data
+    const calcStatus = (units: number): 'CRITICAL' | 'LOW' | 'ADEQUATE' => {
+      if (units < 8) return 'CRITICAL';
+      if (units <= 20) return 'LOW';
+      return 'ADEQUATE';
+    };
+
+    const initialStocks: HospitalStockItem[] = [
+      {
+        hospitalId: 'hosp-001',
+        hospitalName: 'Teaching Hospital Jaffna Blood Bank',
+        district: 'Jaffna',
+        province: 'Northern Province',
+        type: 'Teaching Hospital',
+        phone: '+94 21 222 2261',
+        address: 'Hospital Road, Jaffna',
+        lastUpdated: new Date().toISOString(),
+        inventory: {
+          'O-': { units: 4, status: calcStatus(4) },
+          'A-': { units: 3, status: calcStatus(3) },
+          'B-': { units: 5, status: calcStatus(5) },
+          'AB-': { units: 2, status: calcStatus(2) },
+          'O+': { units: 42, status: calcStatus(42) },
+          'A+': { units: 29, status: calcStatus(29) },
+          'B+': { units: 35, status: calcStatus(35) },
+          'AB+': { units: 18, status: calcStatus(18) },
+        }
+      },
+      {
+        hospitalId: 'hosp-004',
+        hospitalName: 'Base Hospital Chavakachcheri',
+        district: 'Jaffna',
+        province: 'Northern Province',
+        type: 'Base Hospital',
+        phone: '+94 21 227 2261',
+        address: 'Kandy Road, Chavakachcheri',
+        lastUpdated: new Date().toISOString(),
+        inventory: {
+          'O-': { units: 2, status: calcStatus(2) },
+          'A-': { units: 2, status: calcStatus(2) },
+          'B-': { units: 3, status: calcStatus(3) },
+          'AB-': { units: 1, status: calcStatus(1) },
+          'O+': { units: 15, status: calcStatus(15) },
+          'A+': { units: 14, status: calcStatus(14) },
+          'B+': { units: 18, status: calcStatus(18) },
+          'AB+': { units: 9, status: calcStatus(9) },
+        }
+      },
+      {
+        hospitalId: 'hosp-003',
+        hospitalName: 'Base Hospital Point Pedro',
+        district: 'Jaffna',
+        province: 'Northern Province',
+        type: 'Base Hospital',
+        phone: '+94 21 226 2261',
+        address: 'Main Street, Point Pedro',
+        lastUpdated: new Date().toISOString(),
+        inventory: {
+          'O-': { units: 3, status: calcStatus(3) },
+          'A-': { units: 2, status: calcStatus(2) },
+          'B-': { units: 4, status: calcStatus(4) },
+          'AB-': { units: 1, status: calcStatus(1) },
+          'O+': { units: 25, status: calcStatus(25) },
+          'A+': { units: 16, status: calcStatus(16) },
+          'B+': { units: 22, status: calcStatus(22) },
+          'AB+': { units: 8, status: calcStatus(8) },
+        }
+      },
+      {
+        hospitalId: 'hosp-009',
+        hospitalName: 'National Blood Center (NBTS Narahenpita)',
+        district: 'Colombo',
+        province: 'Western Province',
+        type: 'Specialized',
+        phone: '+94 11 269 8450',
+        address: '555/5 Elvitigala Mawatha, Colombo 05',
+        lastUpdated: new Date().toISOString(),
+        inventory: {
+          'O-': { units: 14, status: calcStatus(14) },
+          'A-': { units: 12, status: calcStatus(12) },
+          'B-': { units: 16, status: calcStatus(16) },
+          'AB-': { units: 6, status: calcStatus(6) },
+          'O+': { units: 120, status: calcStatus(120) },
+          'A+': { units: 85, status: calcStatus(85) },
+          'B+': { units: 98, status: calcStatus(98) },
+          'AB+': { units: 45, status: calcStatus(45) },
+        }
+      },
+      {
+        hospitalId: 'hosp-006',
+        hospitalName: 'National Hospital Kandy Blood Center',
+        district: 'Kandy',
+        province: 'Central Province',
+        type: 'Teaching Hospital',
+        phone: '+94 81 222 2261',
+        address: 'William Gopallawa Mawatha, Kandy',
+        lastUpdated: new Date().toISOString(),
+        inventory: {
+          'O-': { units: 5, status: calcStatus(5) },
+          'A-': { units: 4, status: calcStatus(4) },
+          'B-': { units: 6, status: calcStatus(6) },
+          'AB-': { units: 3, status: calcStatus(3) },
+          'O+': { units: 38, status: calcStatus(38) },
+          'A+': { units: 30, status: calcStatus(30) },
+          'B+': { units: 34, status: calcStatus(34) },
+          'AB+': { units: 15, status: calcStatus(15) },
+        }
+      },
+      {
+        hospitalId: 'hosp-007',
+        hospitalName: 'Karapitiya Teaching Hospital, Galle',
+        district: 'Galle',
+        province: 'Southern Province',
+        type: 'Teaching Hospital',
+        phone: '+94 91 223 2261',
+        address: 'Karapitiya, Galle',
+        lastUpdated: new Date().toISOString(),
+        inventory: {
+          'O-': { units: 6, status: calcStatus(6) },
+          'A-': { units: 5, status: calcStatus(5) },
+          'B-': { units: 7, status: calcStatus(7) },
+          'AB-': { units: 2, status: calcStatus(2) },
+          'O+': { units: 45, status: calcStatus(45) },
+          'A+': { units: 26, status: calcStatus(26) },
+          'B+': { units: 28, status: calcStatus(28) },
+          'AB+': { units: 12, status: calcStatus(12) },
+        }
+      },
+      {
+        hospitalId: 'hosp-008',
+        hospitalName: 'Teaching Hospital Batticaloa',
+        district: 'Batticaloa',
+        province: 'Eastern Province',
+        type: 'Teaching Hospital',
+        phone: '+94 65 222 2261',
+        address: 'Hospital Road, Batticaloa',
+        lastUpdated: new Date().toISOString(),
+        inventory: {
+          'O-': { units: 3, status: calcStatus(3) },
+          'A-': { units: 3, status: calcStatus(3) },
+          'B-': { units: 4, status: calcStatus(4) },
+          'AB-': { units: 1, status: calcStatus(1) },
+          'O+': { units: 28, status: calcStatus(28) },
+          'A+': { units: 18, status: calcStatus(18) },
+          'B+': { units: 22, status: calcStatus(22) },
+          'AB+': { units: 10, status: calcStatus(10) },
+        }
+      }
+    ];
+
+    for (const item of initialStocks) {
+      this.hospitalStocks.set(item.hospitalId, item);
+    }
 
     // Audit initial setup
     this.logAudit({

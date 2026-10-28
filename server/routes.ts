@@ -764,6 +764,61 @@ router.patch('/donors/profile', authenticate, authorize('DONOR'), (req: Request,
   return res.json({ success: true, profile });
 });
 
+// Update requester profile
+router.patch('/requesters/profile', authenticate, authorize('REQUESTER'), async (req: Request, res: Response) => {
+  const user = (req as any).user as User;
+  let profile = db.requesterProfiles.get(user.id);
+  if (!profile) {
+    profile = {
+      id: 'reqp-' + user.id,
+      userId: user.id,
+      province: 'Northern Province',
+      district: 'Jaffna',
+      city: 'Jaffna Town',
+      organizationName: ''
+    };
+  }
+
+  const { city, district, province, organizationName, fullName, phone } = req.body;
+
+  if (city) profile.city = city;
+  if (district) profile.district = district;
+  if (province) profile.province = province;
+  if (organizationName !== undefined) profile.organizationName = organizationName;
+
+  if (fullName || phone) {
+    if (fullName) user.fullName = fullName;
+    if (phone) user.phone = phone;
+    user.updatedAt = new Date().toISOString();
+    db.users.set(user.id, user);
+    try {
+      await saveUserToSupabase(user);
+      await saveUserToCloudSql(user);
+    } catch {
+      // ignore
+    }
+  }
+
+  db.requesterProfiles.set(user.id, profile);
+  try {
+    await saveRequesterProfileToSupabase(profile);
+    await saveRequesterProfileToCloudSql(profile);
+  } catch {
+    // ignore
+  }
+
+  db.logAudit({
+    actorId: user.id,
+    actorEmail: user.email,
+    action: 'REQUESTER_PROFILE_UPDATED',
+    targetType: 'REQUESTER_PROFILE',
+    targetId: profile.id,
+    metadata: `District: ${profile.district}, City: ${profile.city}`
+  });
+
+  return res.json({ success: true, profile, user });
+});
+
 // -------------------------------------------------------------
 // BLOOD REQUESTS
 // -------------------------------------------------------------
@@ -874,6 +929,173 @@ router.post('/requests', (req: Request, res: Response) => {
     return res.status(500).json({ error: 'Failed to create blood request.' });
   }
 });
+
+// ==========================================
+// HOSPITAL BLOOD BANK LIVE STOCK API
+// ==========================================
+router.get('/blood-stock', (req: Request, res: Response) => {
+  const { province, district, bloodGroup, status } = req.query;
+
+  let stocks = Array.from(db.hospitalStocks.values());
+
+  if (province) {
+    stocks = stocks.filter(s => s.province.toLowerCase() === String(province).toLowerCase());
+  }
+
+  if (district) {
+    stocks = stocks.filter(s => s.district.toLowerCase() === String(district).toLowerCase());
+  }
+
+  // Calculate summary stats
+  let totalUnits = 0;
+  let criticalCount = 0;
+
+  const formatted = stocks.map(stock => {
+    const hospitalCriticalGroups: string[] = [];
+    let hospitalTotalUnits = 0;
+
+    Object.entries(stock.inventory).forEach(([group, info]) => {
+      hospitalTotalUnits += info.units;
+      totalUnits += info.units;
+      if (info.status === 'CRITICAL') {
+        criticalCount++;
+        hospitalCriticalGroups.push(group);
+      }
+    });
+
+    let overallStatus: 'CRITICAL' | 'MODERATE' | 'SUFFICIENT' = 'SUFFICIENT';
+    if (hospitalCriticalGroups.length >= 3) {
+      overallStatus = 'CRITICAL';
+    } else if (hospitalCriticalGroups.length > 0) {
+      overallStatus = 'MODERATE';
+    }
+
+    return {
+      ...stock,
+      totalHospitalUnits: hospitalTotalUnits,
+      criticalGroups: hospitalCriticalGroups,
+      overallStatus
+    };
+  });
+
+  // Filter by bloodGroup if requested (e.g. show hospitals with critical shortage of O-)
+  let filtered = formatted;
+  if (bloodGroup) {
+    const bg = String(bloodGroup).toUpperCase();
+    filtered = filtered.filter(f => f.inventory[bg] !== undefined);
+  }
+
+  if (status) {
+    filtered = filtered.filter(f => f.overallStatus === String(status).toUpperCase());
+  }
+
+  return res.json({
+    success: true,
+    stocks: filtered,
+    summary: {
+      totalUnits,
+      criticalAlerts: criticalCount,
+      hospitalsMonitored: stocks.length,
+      lastSync: new Date().toISOString()
+    }
+  });
+});
+
+// ==========================================
+// DIGITAL DONOR QR VERIFICATION API
+// ==========================================
+router.get('/donors/verify/:id', (req: Request, res: Response) => {
+  const targetId = req.params.id?.trim();
+  if (!targetId) {
+    return res.status(400).json({ success: false, error: 'Donor identifier is required' });
+  }
+
+  // Find donor by profile id or user id or email
+  let foundDonor: DonorProfile | undefined;
+  let foundUser: User | undefined;
+
+  for (const [userId, profile] of db.donorProfiles.entries()) {
+    if (profile.id === targetId || profile.userId === targetId || userId === targetId) {
+      foundDonor = profile;
+      foundUser = db.users.get(userId);
+      break;
+    }
+  }
+
+  if (!foundDonor || !foundUser) {
+    const user = db.users.get(targetId);
+    if (user && user.role === 'DONOR') {
+      foundUser = user;
+      foundDonor = db.donorProfiles.get(user.id);
+    }
+  }
+
+  if (!foundDonor || !foundUser) {
+    return res.status(404).json({
+      success: false,
+      valid: false,
+      message: 'No registered blood donor found with this verification ID in the LifeLink Sri Lanka registry.'
+    });
+  }
+
+  // Calculate 90-day clinical donation recovery interval per NBTS guidelines
+  let clinicalStatus: 'ELIGIBLE_NOW' | 'RECOVERY_PERIOD' = 'ELIGIBLE_NOW';
+  let daysUntilEligible = 0;
+  let nextEligibleDate: string | null = null;
+
+  if (foundDonor.lastDonationDate) {
+    const lastDate = new Date(foundDonor.lastDonationDate);
+    const now = new Date();
+    const diffTime = now.getTime() - lastDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 90) {
+      clinicalStatus = 'RECOVERY_PERIOD';
+      daysUntilEligible = 90 - diffDays;
+      const nextDate = new Date(lastDate);
+      nextDate.setDate(nextDate.getDate() + 90);
+      nextEligibleDate = nextDate.toISOString();
+    }
+  }
+
+  // Count confirmed donations
+  let totalDonations = 0;
+  for (const hist of db.donationHistory.values()) {
+    if (hist.donorId === foundUser.id) {
+      totalDonations++;
+    }
+  }
+  if (totalDonations === 0 && foundDonor.lastDonationDate) {
+    totalDonations = 1;
+  }
+
+  // Cryptographic-like short hash for official verification seal
+  const cardHash = `LL-LK-${foundDonor.bloodGroup.replace('+', 'P').replace('-', 'N')}-${foundDonor.id.substring(Math.max(0, foundDonor.id.length - 4)).toUpperCase()}`;
+
+  return res.json({
+    success: true,
+    verification: {
+      valid: true,
+      donorId: foundDonor.id,
+      userId: foundUser.id,
+      fullName: foundUser.fullName,
+      bloodGroup: foundDonor.bloodGroup,
+      district: foundDonor.district,
+      province: foundDonor.province,
+      city: foundDonor.city,
+      isVerified: foundUser.isVerified,
+      isAvailable: foundDonor.isAvailable,
+      lastDonationDate: foundDonor.lastDonationDate,
+      clinicalStatus,
+      daysUntilEligible,
+      nextEligibleDate,
+      totalDonationsCount: Math.max(totalDonations, 1),
+      digitalCardHash: cardHash,
+      issuedAt: foundDonor.verifiedAt || foundUser.createdAt
+    }
+  });
+});
+
 
 router.get('/requests', (req: Request, res: Response) => {
   const token = req.cookies?.lifelink_session || req.headers.authorization?.replace('Bearer ', '');

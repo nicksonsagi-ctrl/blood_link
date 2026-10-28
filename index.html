@@ -16,8 +16,14 @@
     <meta name="twitter:title" content="LifeLink - Smart Blood Donation Management System" />
     <meta name="twitter:description" content="Smart Blood Donation Management System for Sri Lanka, connecting verified blood donors, patients, hospitals, and campaigns with role-based dashboards." />
     <meta name="twitter:image" content="/images/hero_hands_heart.jpg" />
+    <meta name="theme-color" content="#DC0A20" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="LifeLink" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="apple-touch-icon" href="/images/hero_hands_heart.jpg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -26,6 +32,15 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(err => {
+            console.debug('ServiceWorker registration optional notice:', err);
+          });
+        });
+      }
+    </script>
   </body>
 </html>
 

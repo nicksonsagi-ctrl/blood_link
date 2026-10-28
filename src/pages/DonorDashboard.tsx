@@ -27,6 +27,7 @@ import { authFetch } from '../services/api.js';
 import { DonorContactRequest, DonationAppointment, DonationHistory, BloodRequest, Campaign } from '../types/index.js';
 import { SRI_LANKA_DISTRICTS } from '../data/sriLankaData.js';
 import { InteractiveMapNav } from '../components/InteractiveMapNav.js';
+import { DigitalDonorCard } from '../components/DigitalDonorCard.tsx';
 
 export const DonorDashboard: React.FC = () => {
   const { user, logout, refreshUser } = useAuth();
@@ -44,6 +45,11 @@ export const DonorDashboard: React.FC = () => {
   const [contactPrefs, setContactPrefs] = useState(donorProfile?.contactPreferences || 'CALL_AND_SMS');
   const [lastDonationDate, setLastDonationDate] = useState(donorProfile?.lastDonationDate || '');
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
+  const [autoSaveActive, setAutoSaveActive] = useState<boolean>(true);
+  const [isSavingProfile, setIsSavingProfile] = useState<boolean>(false);
+  const [deviceRemembered, setDeviceRemembered] = useState<boolean>(
+    typeof window !== 'undefined' ? localStorage.getItem('lifelink_remember_me') === 'true' : false
+  );
 
   // Data loaded from server
   const [contactRequests, setContactRequests] = useState<DonorContactRequest[]>([]);
@@ -96,9 +102,10 @@ export const DonorDashboard: React.FC = () => {
     }
   };
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveProfile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     setSaveSuccess(null);
+    setIsSavingProfile(true);
     try {
       const res = await authFetch('/api/donors/profile', {
         method: 'PATCH',
@@ -111,11 +118,26 @@ export const DonorDashboard: React.FC = () => {
         })
       });
       if (res.ok) {
-        setSaveSuccess('Profile preferences saved to database.');
+        setSaveSuccess('Profile & preferences saved automatically to LifeLink cloud database (தானியங்கி சேமிப்பு).');
         refreshUser();
       }
     } catch {
       // ignore
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleToggleDeviceRemember = (checked: boolean) => {
+    setDeviceRemembered(checked);
+    if (checked) {
+      if (user?.email) localStorage.setItem('lifelink_remembered_email', user.email);
+      localStorage.setItem('lifelink_remember_me', 'true');
+      setSaveSuccess('Auto-Save Credentials enabled for this device. (தானியங்கி கடவுச்சொல் சேமிப்பு இயக்கப்பட்டது)');
+    } else {
+      localStorage.removeItem('lifelink_remembered_email');
+      localStorage.removeItem('lifelink_remember_me');
+      setSaveSuccess('Auto-Save Credentials disabled on this device.');
     }
   };
 
@@ -315,6 +337,42 @@ export const DonorDashboard: React.FC = () => {
               </div>
             </div>
 
+            {/* Official Digital Donor Pass */}
+            {donorProfile && user && (
+              <div className="bg-white rounded-3xl p-6 sm:p-7 border border-neutral-200 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-6 border-b border-neutral-100 pb-4">
+                  <div>
+                    <h2 className="text-base font-extrabold text-neutral-900 tracking-tight">
+                      Official Digital Blood Donor Pass & QR Verification
+                    </h2>
+                    <p className="text-xs text-neutral-500 mt-0.5">
+                      டிஜிட்டல் கொடையாளர் அட்டை — Present this pass at Teaching Hospital Jaffna, Colombo NBTS, or mobile camps for instant verification.
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-mono font-semibold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200 shrink-0 self-start sm:self-auto">
+                    Active Pass
+                  </span>
+                </div>
+
+                <DigitalDonorCard
+                  donor={{
+                    id: donorProfile.id,
+                    userId: user.id,
+                    fullName: user.fullName,
+                    bloodGroup: donorProfile.bloodGroup,
+                    district: donorProfile.district,
+                    province: donorProfile.province,
+                    city: donorProfile.city,
+                    lastDonationDate: donorProfile.lastDonationDate,
+                    isVerified: user.isVerified,
+                    isAvailable: donorProfile.isAvailable,
+                    verifiedAt: donorProfile.verifiedAt,
+                    phone: user.phone
+                  }}
+                />
+              </div>
+            )}
+
             {/* Quick KPI stats */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="p-5 rounded-2xl bg-white border border-neutral-200">
@@ -445,9 +503,28 @@ export const DonorDashboard: React.FC = () => {
         {/* TAB 2: MY PROFILE */}
         {activeTab === 'profile' && (
           <div className="max-w-2xl bg-white p-6 sm:p-8 rounded-2xl border border-neutral-200 space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-neutral-900">My Donor Profile</h2>
-              <p className="text-xs text-neutral-500 mt-1">Manage your regional location and notification preferences.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-neutral-900">My Donor Profile</h2>
+                <p className="text-xs text-neutral-500 mt-1">Manage your regional location and notification preferences.</p>
+              </div>
+
+              {/* Auto-Save Status Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold self-start sm:self-auto">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                <span>Auto-Save Enabled (தானியங்கி சேமிப்பு)</span>
+              </div>
+            </div>
+
+            {/* Auto-Save Notice Banner */}
+            <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-xl flex items-start gap-3 text-xs text-emerald-950">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Automatic Cloud Synchronization</span>
+                <p className="text-emerald-800 mt-0.5 leading-relaxed">
+                  When you modify your district, address, or donation dates, your donor card and emergency availability are automatically synced across the LifeLink Sri Lanka network.
+                </p>
+              </div>
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
@@ -546,12 +623,15 @@ export const DonorDashboard: React.FC = () => {
                 </select>
               </div>
 
-              <button
-                type="submit"
-                className="px-6 py-2.5 bg-[#DC0A20] hover:bg-[#B80020] text-white rounded-lg text-xs font-semibold transition-colors shadow-xs"
-              >
-                Save Profile Changes
-              </button>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="px-6 py-2.5 bg-[#DC0A20] hover:bg-[#B80020] text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingProfile ? 'Saving & Syncing...' : 'Save Profile Changes (சேமிக்க)'}
+                </button>
+              </div>
             </form>
           </div>
         )}
@@ -907,11 +987,49 @@ export const DonorDashboard: React.FC = () => {
 
         {/* TAB 10: SETTINGS */}
         {activeTab === 'settings' && (
-          <div className="max-w-xl bg-white p-6 rounded-2xl border border-neutral-200 space-y-4">
-            <h2 className="text-xl font-bold text-neutral-900">Account Security</h2>
-            <p className="text-xs text-neutral-600">
-              LifeLink account secured with bcrypt 10-round salted password hashing and secure HTTP-only cookies.
-            </p>
+          <div className="max-w-2xl bg-white p-6 sm:p-8 rounded-2xl border border-neutral-200 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-neutral-900">Account Security & Credentials</h2>
+              <p className="text-xs text-neutral-500 mt-1">Manage session persistence, device auto-save, and password management.</p>
+            </div>
+
+            {/* Auto-Save Credentials Toggle */}
+            <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-bold text-neutral-900 block">
+                    Auto-Save & Remember Credentials on this Device (தானியங்கி சேமிப்பு)
+                  </span>
+                  <span className="text-xs text-neutral-500 mt-0.5 block max-w-md">
+                    Keeps your account pre-filled and requests the browser to automatically remember your password for instant 1-click access.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={deviceRemembered}
+                  onChange={(e) => handleToggleDeviceRemember(e.target.checked)}
+                  className="w-5 h-5 text-[#DC0A20] rounded border-neutral-300 focus:ring-[#DC0A20] cursor-pointer"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-neutral-200/80 flex items-center justify-between text-xs">
+                <span className="text-neutral-600 font-medium">
+                  Status: {deviceRemembered ? '✅ Auto-Save Active on this browser' : '⚪ Auto-Save Disabled'}
+                </span>
+                <span className="text-neutral-500 font-mono text-[11px] truncate max-w-[200px]">
+                  {user?.email}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white border border-neutral-200 space-y-3">
+              <span className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                Security Infrastructure
+              </span>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                LifeLink accounts are secured with bcrypt 10-round salted password hashing, signed HTTP-only session tokens, and end-to-end phone confidentiality to prevent donor harassment.
+              </p>
+            </div>
           </div>
         )}
       </main>

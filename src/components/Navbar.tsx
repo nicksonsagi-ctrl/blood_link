@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Heart, Globe, Menu, X, User as UserIcon, LogOut, LayoutDashboard } from 'lucide-react';
+import { Heart, Globe, Menu, X, User as UserIcon, LogOut, LayoutDashboard, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.js';
 import { useLanguage } from '../context/LanguageContext.js';
 import { Language } from '../data/translations.js';
@@ -26,6 +26,10 @@ export const Navbar: React.FC<NavbarProps> = ({ onOpenAuth }) => {
   const navLinks = [
     { label: t.nav.home, href: '/' },
     { label: t.nav.findDonors, href: '/find-donors' },
+    { 
+      label: language === 'ta' ? 'ரத்த இருப்பு நிலை' : language === 'si' ? 'රුධිර තොග' : 'Live Blood Stock', 
+      href: '/blood-stock' 
+    },
     { label: t.nav.requestBlood, href: '/request-blood' },
     { label: t.nav.campaigns, href: '/campaigns' },
     { label: t.nav.guide, href: '/donation-guide' },

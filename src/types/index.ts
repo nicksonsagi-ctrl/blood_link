@@ -211,3 +211,37 @@ export interface SystemStats {
   activeCampaigns: number;
   unreadMessages: number;
 }
+
+export interface HospitalBloodStock {
+  hospitalId: string;
+  hospitalName: string;
+  district: string;
+  province: string;
+  type: string;
+  phone: string;
+  address?: string;
+  lastUpdated: string;
+  inventory: Record<string, { units: number; status: 'CRITICAL' | 'LOW' | 'ADEQUATE' }>;
+  overallStatus: 'CRITICAL' | 'MODERATE' | 'SUFFICIENT';
+  criticalGroups: string[];
+}
+
+export interface DonorVerificationResult {
+  valid: boolean;
+  donorId: string;
+  fullName: string;
+  bloodGroup: string;
+  district: string;
+  province: string;
+  city: string;
+  isVerified: boolean;
+  isAvailable: boolean;
+  lastDonationDate: string | null;
+  clinicalStatus: 'ELIGIBLE_NOW' | 'RECOVERY_PERIOD';
+  daysUntilEligible: number;
+  nextEligibleDate: string | null;
+  totalDonationsCount: number;
+  digitalCardHash: string;
+  issuedAt: string;
+}
+

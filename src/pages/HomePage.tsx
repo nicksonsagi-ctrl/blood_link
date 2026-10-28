@@ -453,6 +453,108 @@ export const HomePage: React.FC<HomePageProps> = ({ onOpenAuth }) => {
         </div>
       </section>
 
+      {/* 4.5. LIVE HOSPITAL BLOOD STOCK & DIGITAL DONOR PASS SHOWCASE */}
+      <section className="py-14 bg-gradient-to-b from-white to-neutral-50/60 border-b border-neutral-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            
+            {/* Left Column: Hospital Stock Tracker Highlight */}
+            <div className="lg:col-span-7 space-y-5">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-red-700 text-xs font-bold">
+                <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
+                <span>New Feature: Live Hospital Blood Bank Tracker (நேரடி ரத்த இருப்பு நிலை)</span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-neutral-900 tracking-tight leading-tight">
+                Real-Time Blood Bank Stock Levels Across Sri Lanka Hospitals
+              </h2>
+
+              <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed">
+                Monitor live availability of critical red cell and plasma units across Teaching Hospital Jaffna, Chavakachcheri Base Hospital, Point Pedro, Colombo National Blood Center, Kandy, and Galle. Donors can instantly see which hospital has a critical shortage of their blood group and pledge a donation.
+              </p>
+
+              {/* Quick Hospital Stock Tickers */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="p-4 rounded-2xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-neutral-900">Teaching Hospital Jaffna</span>
+                    <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-700 font-bold text-[10px]">O- Urgent</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500">Hospital Road, Jaffna &middot; +94 21 222 2261</p>
+                  <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-neutral-100">
+                    <span className="text-neutral-500 text-[11px]">Certified Blood Bank</span>
+                    <Link to="/blood-stock" className="text-red-600 font-bold hover:underline text-[11px]">
+                      View Inventory &rarr;
+                    </Link>
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-white border border-neutral-200 shadow-2xs">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-neutral-900">Colombo NBTS Center</span>
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-bold text-[10px]">Active Supply</span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500">Narahenpita, Colombo 05 &middot; 1923 Hotline</p>
+                  <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-neutral-100">
+                    <span className="text-neutral-500 text-[11px]">Central Blood Bank</span>
+                    <Link to="/blood-stock" className="text-red-600 font-bold hover:underline text-[11px]">
+                      View Inventory &rarr;
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 pt-2">
+                <Link
+                  to="/blood-stock"
+                  className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-xl shadow-xs transition inline-flex items-center gap-2"
+                >
+                  <Activity className="w-4 h-4" />
+                  <span>Open Live Blood Stock Board</span>
+                </Link>
+                <Link
+                  to="/verify-donor"
+                  className="px-4 py-2.5 bg-white hover:bg-neutral-50 text-neutral-800 border border-neutral-300 font-semibold text-xs rounded-xl shadow-2xs transition inline-flex items-center gap-2"
+                >
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Verify Donor Pass / QR</span>
+                </Link>
+              </div>
+            </div>
+
+            {/* Right Column: Visual Preview Card of Digital Donor Pass & Stock UI */}
+            <div className="lg:col-span-5">
+              <div className="relative rounded-3xl overflow-hidden border border-neutral-200 shadow-xl bg-white p-2">
+                <img
+                  src="/images/donor_card_stock_preview.jpg"
+                  alt="LifeLink Digital Blood Donor Card & Hospital Stock Tracker UI Preview"
+                  className="w-full h-auto rounded-2xl object-cover shadow-inner"
+                  onError={(e) => {
+                    // Fallback to hero image if preview not loaded
+                    (e.target as HTMLImageElement).src = '/images/donor_safe_donation.jpg';
+                  }}
+                />
+                <div className="p-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-extrabold text-neutral-900 flex items-center gap-1.5">
+                      <Droplets className="w-4 h-4 text-red-600" />
+                      Digital Donor Card with QR Verification
+                    </span>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full font-bold border border-emerald-200">
+                      NBTS 90-Day Standard
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-neutral-500 leading-normal">
+                    Donors receive an official digital ID pass with verifiable QR code. Hospitals scan to instantly confirm blood group and clinical recovery interval.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* 5. RECENT BLOOD REQUESTS SECTION */}
       <section className="py-16 bg-[#FAFAFA] border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

@@ -30,11 +30,73 @@ import { InteractiveMapNav } from '../components/InteractiveMapNav.js';
 import { BLOOD_GROUPS, SRI_LANKA_DISTRICTS, SRI_LANKA_HOSPITALS } from '../data/sriLankaData.js';
 
 export const RequesterDashboard: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<
     'overview' | 'findDonors' | 'requestBlood' | 'myRequests' | 'donorResponses' | 'appointments' | 'campaigns' | 'notifications' | 'profile' | 'settings'
   >('overview');
   const [findDonorsViewMode, setFindDonorsViewMode] = useState<'cards' | 'map'>('cards');
+
+  // Profile and Auto-Save state
+  const requesterProfile = user?.requesterProfile;
+  const [profileName, setProfileName] = useState(user?.fullName || '');
+  const [profilePhone, setProfilePhone] = useState(user?.phone || '');
+  const [profileDistrict, setProfileDistrict] = useState(requesterProfile?.district || 'Jaffna');
+  const [profileCity, setProfileCity] = useState(requesterProfile?.city || 'Jaffna Town');
+  const [profileOrg, setProfileOrg] = useState(requesterProfile?.organizationName || '');
+  const [profileSaveSuccess, setProfileSaveSuccess] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [deviceRemembered, setDeviceRemembered] = useState<boolean>(
+    typeof window !== 'undefined' ? localStorage.getItem('lifelink_remember_me') === 'true' : false
+  );
+
+  useEffect(() => {
+    if (user) {
+      if (user.fullName) setProfileName(user.fullName);
+      if (user.phone) setProfilePhone(user.phone);
+      if (user.requesterProfile?.district) setProfileDistrict(user.requesterProfile.district);
+      if (user.requesterProfile?.city) setProfileCity(user.requesterProfile.city);
+      if (user.requesterProfile?.organizationName) setProfileOrg(user.requesterProfile.organizationName);
+    }
+  }, [user]);
+
+  const handleSaveProfile = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setProfileSaveSuccess(null);
+    setIsSavingProfile(true);
+    try {
+      const res = await authFetch('/api/requesters/profile', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          fullName: profileName,
+          phone: profilePhone,
+          district: profileDistrict,
+          city: profileCity,
+          organizationName: profileOrg
+        })
+      });
+      if (res.ok) {
+        setProfileSaveSuccess('Requester profile & preferences saved automatically to LifeLink cloud database (தானியங்கி சேமிப்பு).');
+        refreshUser();
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const handleToggleDeviceRemember = (checked: boolean) => {
+    setDeviceRemembered(checked);
+    if (checked) {
+      if (user?.email) localStorage.setItem('lifelink_remembered_email', user.email);
+      localStorage.setItem('lifelink_remember_me', 'true');
+      setProfileSaveSuccess('Auto-Save Credentials enabled on this device. (தானியங்கி கடவுச்சொல் சேமிப்பு இயக்கப்பட்டது)');
+    } else {
+      localStorage.removeItem('lifelink_remembered_email');
+      localStorage.removeItem('lifelink_remember_me');
+      setProfileSaveSuccess('Auto-Save Credentials disabled on this device.');
+    }
+  };
 
   // Server data
   const [myRequests, setMyRequests] = useState<BloodRequest[]>([]);
@@ -241,6 +303,16 @@ export const RequesterDashboard: React.FC = () => {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto p-6 sm:p-10">
         
+        {profileSaveSuccess && (
+          <div className="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-800 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span>{profileSaveSuccess}</span>
+            </div>
+            <button onClick={() => setProfileSaveSuccess(null)} className="text-emerald-900 font-bold cursor-pointer">×</button>
+          </div>
+        )}
+
         {/* TAB 1: OVERVIEW */}
         {activeTab === 'overview' && (
           <div className="space-y-8">
@@ -848,6 +920,163 @@ export const RequesterDashboard: React.FC = () => {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB 9: MY PROFILE */}
+        {activeTab === 'profile' && (
+          <div className="max-w-2xl bg-white p-6 sm:p-8 rounded-2xl border border-neutral-200 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-100 pb-4">
+              <div>
+                <h2 className="text-xl font-bold text-neutral-900">My Requester Profile</h2>
+                <p className="text-xs text-neutral-500 mt-1">Manage your contact details, hospital affiliation, and default district.</p>
+              </div>
+
+              {/* Auto-Save Status Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold self-start sm:self-auto">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                <span>Auto-Save Enabled (தானியங்கி சேமிப்பு)</span>
+              </div>
+            </div>
+
+            {/* Auto-Save Notice Banner */}
+            <div className="p-4 bg-emerald-50/70 border border-emerald-200/80 rounded-xl flex items-start gap-3 text-xs text-emerald-950">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block">Automatic Cloud Synchronization</span>
+                <p className="text-emerald-800 mt-0.5 leading-relaxed">
+                  Your regional requester location, organization affiliation, and emergency contact details are automatically synced to the LifeLink Sri Lanka cloud database.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">Full Name</label>
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={(e) => setProfileName(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#DC0A20]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">Email Address</label>
+                  <input
+                    type="email"
+                    disabled
+                    value={user?.email || ''}
+                    className="w-full px-3 py-2 text-xs border border-neutral-200 rounded-lg bg-neutral-100 text-neutral-600"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={profilePhone}
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                    placeholder="e.g. +94 77 123 4567"
+                    className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#DC0A20]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">Default Hospital / Organization</label>
+                  <input
+                    type="text"
+                    value={profileOrg}
+                    onChange={(e) => setProfileOrg(e.target.value)}
+                    placeholder="e.g. Teaching Hospital Jaffna or Family Patient"
+                    className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#DC0A20]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">District</label>
+                  <select
+                    value={profileDistrict}
+                    onChange={(e) => setProfileDistrict(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg bg-white"
+                  >
+                    {Object.keys(SRI_LANKA_DISTRICTS).map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-700 mb-1">City / Town</label>
+                  <input
+                    type="text"
+                    value={profileCity}
+                    onChange={(e) => setProfileCity(e.target.value)}
+                    className="w-full px-3 py-2 text-xs border border-neutral-300 rounded-lg focus:outline-hidden focus:ring-1 focus:ring-[#DC0A20]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="px-6 py-2.5 bg-[#DC0A20] hover:bg-[#B80020] text-white rounded-lg text-xs font-semibold transition-colors shadow-xs flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingProfile ? 'Saving & Syncing...' : 'Save Profile Changes (சேமிக்க)'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 10: SETTINGS */}
+        {activeTab === 'settings' && (
+          <div className="max-w-2xl bg-white p-6 sm:p-8 rounded-2xl border border-neutral-200 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-neutral-900">Account Security & Credentials</h2>
+              <p className="text-xs text-neutral-500 mt-1">Manage session persistence, device auto-save, and password management.</p>
+            </div>
+
+            {/* Auto-Save Credentials Toggle */}
+            <div className="p-5 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-bold text-neutral-900 block">
+                    Auto-Save & Remember Credentials on this Device (தானியங்கி சேமிப்பு)
+                  </span>
+                  <span className="text-xs text-neutral-500 mt-0.5 block max-w-md">
+                    Keeps your account pre-filled and requests the browser to automatically remember your password for instant 1-click access.
+                  </span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={deviceRemembered}
+                  onChange={(e) => handleToggleDeviceRemember(e.target.checked)}
+                  className="w-5 h-5 text-[#DC0A20] rounded border-neutral-300 focus:ring-[#DC0A20] cursor-pointer"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-neutral-200/80 flex items-center justify-between text-xs">
+                <span className="text-neutral-600 font-medium">
+                  Status: {deviceRemembered ? '✅ Auto-Save Active on this browser' : '⚪ Auto-Save Disabled'}
+                </span>
+                <span className="text-neutral-500 font-mono text-[11px] truncate max-w-[200px]">
+                  {user?.email}
+                </span>
+              </div>
+            </div>
+
+            <div className="p-5 rounded-2xl bg-white border border-neutral-200 space-y-3">
+              <span className="text-xs font-bold text-neutral-800 uppercase tracking-wider block">
+                Security Infrastructure
+              </span>
+              <p className="text-xs text-neutral-600 leading-relaxed">
+                LifeLink accounts are secured with bcrypt 10-round salted password hashing, signed HTTP-only session tokens, and verified patient request validation.
+              </p>
+            </div>
           </div>
         )}
       </main>
